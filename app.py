@@ -1,7 +1,7 @@
 from fastapi import FastAPI, UploadFile, File
 from transformers import Wav2Vec2ForCTC, Wav2Vec2Processor
 import torch
-import soundfile as sf
+import torchaudio
 from io import BytesIO
 
 app = FastAPI()
@@ -12,12 +12,11 @@ model = Wav2Vec2ForCTC.from_pretrained("myab/wav2vec2-ar-model")
 
 @app.post("/transcribe/")
 async def transcribe(audio: UploadFile = File(...)):
-    # قراءة ملف الصوت
     audio_data = await audio.read()
-    audio_input, sample_rate = sf.read(BytesIO(audio_data))
+    with BytesIO(audio_data) as f:
+        waveform, sample_rate = torchaudio.load(f)
 
-    # تجهيز البيانات
-    inputs = processor(audio_input, sampling_rate=sample_rate, return_tensors="pt", padding=True)
+    inputs = processor(waveform.squeeze().numpy(), sampling_rate=sample_rate, return_tensors="pt", padding=True)
 
     with torch.no_grad():
         logits = model(**inputs).logits
